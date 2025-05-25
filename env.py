@@ -1,0 +1,1 @@
+bot = BasicBot(api_key, api_secret, testnet=True)
