@@ -1,119 +1,17 @@
-2025-05-24 15:56:09,206 - ERROR - Failed to get account info: 'NoneType' object has no attribute 'futures_account'
-2025-05-24 15:57:46,949 - INFO - Placing 2 grid orders on BTCUSDT: 100.0 to 90.0
-2025-05-24 15:57:46,949 - ERROR - Failed to get symbol info: 'NoneType' object has no attribute 'futures_exchange_info'
-2025-05-24 15:57:46,949 - ERROR - Symbol BTCUSDT not found or not active
-2025-05-24 15:57:46,949 - ERROR - Failed to place grid order 1 at price 100.0
-2025-05-24 15:57:47,452 - ERROR - Failed to get symbol info: 'NoneType' object has no attribute 'futures_exchange_info'
-2025-05-24 15:57:47,452 - ERROR - Symbol BTCUSDT not found or not active
-2025-05-24 15:57:47,452 - ERROR - Failed to place grid order 2 at price 90.0
-2025-05-24 15:57:47,955 - INFO - Grid orders completed: 0/2 successful, 2 failed
-2025-05-24 15:59:53,298 - ERROR - Failed to get symbol info: 'NoneType' object has no attribute 'futures_exchange_info'
-2025-05-24 15:59:53,299 - ERROR - Symbol BTCUSDT not found or not active
-2025-05-24 16:01:47,755 - ERROR - Failed to get symbol info: 'NoneType' object has no attribute 'futures_exchange_info'
-2025-05-24 16:01:47,756 - ERROR - Symbol BTCUSDT not found or not active
-2025-05-24 16:11:01,988 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:11:02,398 - ERROR - Failed to get account info: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:12:02,296 - ERROR - Symbol BTC not found or not active
-2025-05-24 16:18:48,194 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:18:48,641 - ERROR - Failed to get account info: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:24:30,949 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:24:31,378 - ERROR - Failed to get account info: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:25:56,547 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:25:56,974 - ERROR - Failed to get account info: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:27:56,944 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:27:57,499 - ERROR - Failed to get account info: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:35:18,358 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:35:18,773 - ERROR - Failed to get account info: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:42:37,084 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:42:37,481 - ERROR - Failed to get account info: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:45:25,660 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:45:26,061 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 16:45:27,499 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 16:45:29,027 - ERROR - Binance API error: Path /fapi/v1/account, Method GET is invalid (Code: -5000)
-2025-05-24 16:45:29,027 - ERROR - Invalid API endpoint. Check testnet configuration.
-2025-05-24 16:46:18,926 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:46:19,395 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 16:46:20,817 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 16:46:22,396 - ERROR - Binance API error: Path /fapi/v1/account, Method GET is invalid (Code: -5000)
-2025-05-24 16:46:22,396 - ERROR - Invalid API endpoint. Check testnet configuration.
-2025-05-24 16:47:18,767 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:47:19,231 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 16:47:20,417 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 16:47:21,587 - ERROR - Binance API error: Path /fapi/v1/account, Method GET is invalid (Code: -5000)
-2025-05-24 16:47:21,587 - ERROR - Invalid API endpoint. Check testnet configuration.
-2025-05-24 16:51:36,485 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 16:51:36,889 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 16:51:38,300 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 16:51:39,709 - ERROR - Binance API error: Path /fapi/v1/account, Method GET is invalid (Code: -5000)
-2025-05-24 16:51:39,709 - ERROR - Invalid API endpoint. Check testnet configuration.
-2025-05-24 16:54:21,025 - ERROR - Failed to initialize client: 'data'
-2025-05-24 16:54:21,641 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 16:54:24,962 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 16:54:26,371 - ERROR - Binance API error: Path /fapi/v1/account, Method GET is invalid (Code: -5000)
-2025-05-24 16:54:26,371 - ERROR - Invalid API endpoint. Check testnet configuration.
-2025-05-24 16:55:30,863 - INFO - Successfully connected to Binance API
-2025-05-24 16:55:31,261 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 16:55:32,673 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 16:55:34,130 - ERROR - Binance API error: Path /fapi/v1/account, Method GET is invalid (Code: -5000)
-2025-05-24 16:55:34,130 - ERROR - Invalid API endpoint. Check testnet configuration.
-2025-05-24 19:38:43,683 - INFO - Successfully connected to Binance API
-2025-05-24 19:38:44,115 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 19:38:45,522 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 19:38:46,934 - ERROR - Binance API error: Path /fapi/v1/account, Method GET is invalid (Code: -5000)
-2025-05-24 19:38:46,934 - ERROR - Invalid API endpoint. Check testnet configuration.
-2025-05-24 19:52:31,013 - INFO - Successfully connected to Binance API
-2025-05-24 19:52:31,013 - ERROR - Failed to get account info: 'data'
-2025-05-24 19:56:24,249 - INFO - Successfully connected to Binance API
-2025-05-24 19:56:24,265 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 19:56:25,267 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 19:56:26,269 - ERROR - Failed to get account info: 'data'
-2025-05-24 20:04:24,807 - INFO - Successfully connected to Binance API
-2025-05-24 20:04:24,807 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:04:25,821 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:04:26,823 - ERROR - Failed to get account info: 'data'
-2025-05-24 20:04:42,797 - INFO - Successfully connected to Binance API
-2025-05-24 20:04:42,797 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:04:43,806 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:04:44,820 - ERROR - Failed to get account level info: 'data'
-2025-05-24 20:05:36,282 - INFO - Successfully connected to Binance API
-2025-05-24 20:05:36,282 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:05:37,298 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:05:38,299 - ERROR - Failed to get account level info: 'data'
-2025-05-24 20:09:56,508 - ERROR - Failed to initialize client: APIError(code=-5000): Path /fapi/v1/account, Method GET is invalid
-2025-05-24 20:09:56,508 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:09:57,523 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:09:58,524 - ERROR - Failed to get account level info: 'data'
-2025-05-24 20:10:58,421 - ERROR - Failed to initialize client: 'data'
-2025-05-24 20:10:58,437 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:10:59,439 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:11:00,440 - ERROR - Failed to get account level info: 'data'
-2025-05-24 20:13:37,941 - ERROR - Failed to initialize client: 'data'
-2025-05-24 20:13:37,957 - ERROR - Failed to get account info: Invalid URL '/fapi/v2/account': No scheme supplied. Perhaps you meant https:///fapi/v2/account?
-2025-05-24 20:15:52,387 - ERROR - Failed to initialize client: 'data'
-2025-05-24 20:15:53,014 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:15:54,719 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:15:56,138 - ERROR - Binance API error: Invalid API-key, IP, or permissions for action (Code: -2015)
-2025-05-24 20:16:36,430 - ERROR - Failed to initialize client: 'data'
-2025-05-24 20:16:36,931 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:16:38,348 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:16:39,756 - ERROR - Binance API error: Invalid API-key, IP, or permissions for action (Code: -2015)
-2025-05-24 20:16:58,478 - INFO - Successfully connected to Binance API
-2025-05-24 20:16:58,875 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:17:00,379 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:17:01,542 - ERROR - Binance API error: Invalid API-key, IP, or permissions for action (Code: -2015)
-2025-05-24 20:22:19,399 - INFO - Successfully connected to Binance API
-2025-05-24 20:22:19,822 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:22:21,126 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:22:22,532 - ERROR - Binance API error: Invalid API-key, IP, or permissions for action (Code: -2015)
-2025-05-24 20:26:09,033 - INFO - Successfully connected to Binance API
-2025-05-24 20:26:09,033 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:26:10,039 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:26:11,042 - ERROR - Failed to get account info: 'data'
-2025-05-24 20:27:53,369 - INFO - Successfully connected to Binance API
-2025-05-24 20:27:53,369 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 20:27:54,375 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 20:27:55,377 - ERROR - Failed to get account info: 'data'
-2025-05-24 21:06:44,391 - INFO - Successfully connected to Binance API
-2025-05-24 21:06:44,395 - WARNING - Attempt 1 failed, retrying...
-2025-05-24 21:06:45,396 - WARNING - Attempt 2 failed, retrying...
-2025-05-24 21:06:46,397 - ERROR - Failed to get account info: 'data'
+2025-05-27 19:50:37 - Successfully verified spot trading access
+2025-05-27 19:51:53 - Successfully verified spot trading access
+2025-05-27 19:52:26 - Placing LIMIT order - Symbol: XRPUSDT, Side: SELL, Quantity: 5.0
+2025-05-27 19:52:26 - ORDER: LIMIT XRPUSDT SELL 5.0 @ 1.8
+2025-05-27 19:52:26 - ORDER: LIMIT XRPUSDT SELL 5.0 @ 1.8 - Status: FILLED (ID: 5378975)
+2025-05-27 19:52:49 - Placing MARKET order - Symbol: SOLUSDT, Side: SELL, Quantity: 0.5
+2025-05-27 19:52:49 - ORDER: MARKET SOLUSDT SELL 0.5
+2025-05-27 19:52:50 - ORDER: MARKET SOLUSDT SELL 0.5 - Status: FILLED (ID: 3459786)
+2025-05-27 19:52:54 - Placing MARKET order - Symbol: SOLUSDT, Side: SELL, Quantity: 0.5
+2025-05-27 19:52:54 - ORDER: MARKET SOLUSDT SELL 0.5
+2025-05-27 19:52:54 - ORDER: MARKET SOLUSDT SELL 0.5 - Status: FILLED (ID: 3459787)
+2025-05-27 19:52:58 - Placing MARKET order - Symbol: SOLUSDT, Side: SELL, Quantity: 0.5
+2025-05-27 19:52:58 - ORDER: MARKET SOLUSDT SELL 0.5
+2025-05-27 19:52:59 - ORDER: MARKET SOLUSDT SELL 0.5 - Status: FILLED (ID: 3459788)
+2025-05-27 19:53:23 - Placing MARKET order - Symbol: BTCUSDT, Side: SELL, Quantity: 0.1
+2025-05-27 19:53:23 - ORDER: MARKET BTCUSDT SELL 0.1
+2025-05-27 19:53:23 - ORDER: MARKET BTCUSDT SELL 0.1 - Status: FILLED (ID: 8175452)
