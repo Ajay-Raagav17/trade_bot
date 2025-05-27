@@ -2,13 +2,7 @@ import logging, time, os
 from binance.client import Client
 from binance.enums import *
 from binance.exceptions import BinanceAPIException, BinanceOrderException
-# Remove or comment out this line if it exists:
-# from binance.websockets import BinanceSocketManager
-
-# Make sure this import is present:
 from binance import ThreadedWebsocketManager
-# Or this for async implementation:
-# from binance import AsyncClient, BinanceSocketManager
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
@@ -22,10 +16,7 @@ from datetime import datetime
 # Add this import for trade_records
 from trade_records import log_order, log_error
 
-# Initialize Rich console
 console = Console()
-
-# Configure logging with Rich handler
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
@@ -35,21 +26,14 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("trading_bot")
-
-# Load API credentials
 try:
     from env import API_KEY, API_SECRET
 except ImportError:
-    # If env.py doesn't exist, try loading from environment variables
     load_dotenv()
     API_KEY = os.getenv('BINANCE_API_KEY')
     API_SECRET = os.getenv('BINANCE_API_SECRET')
-
-# Validate API credentials
 if not API_KEY or not API_SECRET:
     raise ValueError("API credentials are required. Please set them in env.py or as environment variables.")
-
-# Constants and configurations
 DEFAULT_SYMBOL = "BTCUSDT"  # Default trading pair
 DEFAULT_TRADE_SIZE = 0.001   # Default trade quantity
 MAX_RETRIES = 3              # Maximum retry attempts for API calls
@@ -92,22 +76,15 @@ class BasicBot:
 
     def place_order(self, symbol, side, order_type, quantity, price=None, stop_price=None):
         try:
-            # Get symbol info and validate minimum notional value
             symbol_info = self.client.get_symbol_info(symbol)
             if not symbol_info:
                 console.print(f"[red]Error: Trading pair {symbol} not found[/red]")
                 return None
-            
-            # Get current market price
             ticker = self.client.get_symbol_ticker(symbol=symbol)
             current_price = float(ticker['price'])
-            
-            # Get trading filters
             lot_size_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'LOT_SIZE'), None)
             notional_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'MIN_NOTIONAL'), None)
             price_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER'), None)
-            
-            # Validate quantity against LOT_SIZE
             if lot_size_filter:
                 min_qty = float(lot_size_filter['minQty'])
                 max_qty = float(lot_size_filter['maxQty'])
@@ -119,9 +96,6 @@ class BasicBot:
                 if quantity > max_qty:
                     console.print(f"[red]Error: Quantity {quantity} is above maximum allowed ({max_qty})[/red]")
                     return None
-                
-               
-            # Validate price for LIMIT orders
             if order_type == 'LIMIT':
                 if price_filter:
                     min_price = float(price_filter['minPrice'])
@@ -134,15 +108,11 @@ class BasicBot:
                     if price > max_price:
                         console.print(f"[red]Error: Price {price} is above maximum allowed ({max_price})[/red]")
                         return None
-                        
-                    # Check if price is too far from current market price (e.g., 20% deviation)
                     price_deviation = abs(price - current_price) / current_price
                     if price_deviation > 0.20:  # 20% deviation threshold
                         console.print(f"[yellow]Warning: Price {price} is {price_deviation*100:.1f}% away from current market price ({current_price})[/yellow]")
                         if not Confirm.ask("Do you want to continue with this price?"):
                             return None
-            
-            # Validate notional value
             if notional_filter:
                 min_notional = float(notional_filter['minNotional'])
                 order_value = quantity * (price or current_price)
