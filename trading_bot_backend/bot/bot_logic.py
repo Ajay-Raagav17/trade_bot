@@ -1,326 +1,266 @@
-# trading_bot_backend/bot/bot_logic.py
 import logging
 import time
 import os
-import asyncio # Added
-from typing import List, Any, Dict, Optional # Consolidated and added Optional, Dict
+import asyncio
+from typing import List, Any, Dict, Optional
+from decimal import Decimal
+import uuid
 
 from binance.client import Client
 from binance.enums import *
-from binance.exceptions import BinanceAPIException, BinanceOrderException
-from binance import ThreadedWebsocketManager # Added
+from binance.exceptions import BinanceAPIException
+from binance import ThreadedWebsocketManager
 
 try:
-    from .env import API_KEY, API_SECRET
+    from trading_bot_backend.bot.env import API_KEY as DEFAULT_BOT_API_KEY
+    from trading_bot_backend.bot.env import API_SECRET as DEFAULT_BOT_API_SECRET
 except ImportError:
-    from env import API_KEY, API_SECRET # type: ignore
+    DEFAULT_BOT_API_KEY = os.getenv('BINANCE_API_KEY', "your_binance_api_key_here")
+    DEFAULT_BOT_API_SECRET = os.getenv('BINANCE_API_SECRET', "your_binance_api_secret_here")
 
-# Module-level logger configuration is handled in main.py to avoid multiple basicConfig calls.
-# BasicBot will use a child logger.
+from trading_bot_backend.services import trade_service
+from trading_bot_backend.schemas.trade_schemas import TradeCreate
+from trading_bot_backend.database import SessionLocal # type: ignore
+from sqlalchemy.orm import Session # For type hinting db_session_for_log
+from datetime import datetime
 
 DEFAULT_SYMBOL = "BTCUSDT"
-MAX_RETRIES = 3
 
 class BasicBot:
-    def __init__(self):
-        self.logger = logging.getLogger("trading_bot_api.BasicBot") # Child logger
+    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+        self.logger = logging.getLogger("trading_bot_api.BasicBot")
+        self.instance_api_key = api_key or DEFAULT_BOT_API_KEY
+        self.instance_api_secret = api_secret or DEFAULT_BOT_API_SECRET
 
-        if not API_KEY or not API_SECRET:
-            self.logger.error("API credentials are required but not found.")
-            raise ValueError("API credentials are required. Please set them in env.py or as environment variables.")
+        is_placeholder_key = not self.instance_api_key or "your_binance_api_key_here" in self.instance_api_key
+        is_placeholder_secret = not self.instance_api_secret or "your_binance_api_secret_here" in self.instance_api_secret
+        if is_placeholder_key or is_placeholder_secret: # Check against actual default values from env too
+             if self.instance_api_key == DEFAULT_BOT_API_KEY and "your_binance_api_key_here" not in str(DEFAULT_BOT_API_KEY): # Avoid warning if default is a real key
+                 pass
+             elif self.instance_api_secret == DEFAULT_BOT_API_SECRET and "your_binance_api_secret_here" not in str(DEFAULT_BOT_API_SECRET):
+                 pass
+             else:
+                self.logger.warning("BasicBot instance using placeholder Binance API credentials.")
 
-        self.client = Client(API_KEY, API_SECRET, testnet=True)
-        self.logger.info("BasicBot initialized with Spot Testnet configuration.")
+        try:
+            self.client = Client(self.instance_api_key, self.instance_api_secret, testnet=True)
+            self.logger.info(f"BasicBot instance initialized. Testnet: True. API Key: ...{self.instance_api_key[-4:] if self.instance_api_key and len(self.instance_api_key) >= 4 else 'N/A'}")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Binance Client: {e}", exc_info=True)
+            raise ValueError(f"Binance Client initialization failed: {e}")
 
         self.twm: Optional[ThreadedWebsocketManager] = None
         self.user_data_stream_key: Optional[str] = None
-        self.active_websockets: List[Any] = [] # Stores FastAPI WebSocket objects
+        self.active_websockets: List[Any] = []
         self.user_data_stream_started: bool = False
-        self._lock = asyncio.Lock() # For concurrent access to shared WS resources
+        self._lock = asyncio.Lock()
 
-    def verify_spot_access(self): # This remains synchronous
+        self.stream_user_id: Optional[uuid.UUID] = None
+        self.stream_user_api_key_id: Optional[int] = None
+        self.stream_user_binance_api_key_ref: Optional[str] = None
+
+    def verify_spot_access(self):
         try:
             account_info = self.client.get_account()
-            if account_info.get('canTrade'):
-                self.logger.info("Successfully verified spot trading access.")
-                return {"status": "success", "message": "Spot trading access verified."}
-            else:
-                self.logger.error("Spot trading is not enabled for this account.")
-                raise Exception("Spot trading not enabled for this account.")
-        except BinanceAPIException as e:
-            self.logger.error(f"Failed to verify spot trading access: {e}", exc_info=True)
-            raise Exception(f"API Error: Failed to verify spot trading access: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Unexpected error during spot access verification: {e}", exc_info=True)
-            raise Exception(f"Unexpected error verifying spot access: {str(e)}")
+            if account_info.get('canTrade'): return {"status": "success", "message": "Spot trading access verified."}
+            else: raise Exception("Spot trading not enabled for this account.")
+        except BinanceAPIException as e: raise Exception(f"API Error ({e.code}): {e.message}")
+        except Exception as e: raise Exception(f"Unexpected error: {str(e)}")
 
-    def get_account_info(self): # Synchronous
+    def get_account_info(self):
         try:
             account_info = self.client.get_account()
-            non_zero_balances = [{
-                'asset': balance['asset'],
-                'free': float(balance['free']),
-                'locked': float(balance['locked'])
-            } for balance in account_info['balances']
-                if float(balance['free']) > 0 or float(balance['locked']) > 0]
-            return {"status": "success", "balances": non_zero_balances}
-        except BinanceAPIException as e:
-            self.logger.error(f"Failed to fetch account info: {str(e)}", exc_info=True)
-            raise Exception(f"API Error: Failed to fetch account info: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Unexpected error fetching account info: {e}", exc_info=True)
-            raise Exception(f"Unexpected error fetching account info: {str(e)}")
+            balances = [{'asset': b['asset'], 'free': str(b['free']), 'locked': str(b['locked'])}
+                                 for b in account_info['balances'] if float(b['free']) > 0 or float(b['locked']) > 0]
+            return {"status": "success", "balances": balances}
+        except BinanceAPIException as e: raise Exception(f"API Error ({e.code}): {e.message}")
+        except Exception as e: raise Exception(f"Unexpected error: {str(e)}")
 
-    def get_symbol_info(self, symbol: str): # Synchronous
+    def get_symbol_info(self, symbol: str):
         try:
-            symbol_info = self.client.get_symbol_info(symbol)
-            if not symbol_info:
-                 raise ValueError(f"Trading pair {symbol} not found")
-            return {"status": "success", "data": symbol_info}
-        except BinanceAPIException as e:
-            self.logger.error(f"Failed to fetch symbol info for {symbol}: {str(e)}", exc_info=True)
-            raise Exception(f"API Error: Failed to fetch info for {symbol}: {str(e)}")
-        except ValueError as e:
-            self.logger.warning(f"Value error fetching symbol info for {symbol}: {str(e)}")
-            raise e
-        except Exception as e:
-            self.logger.error(f"Unexpected error fetching symbol info for {symbol}: {e}", exc_info=True)
-            raise Exception(f"Unexpected error fetching info for {symbol}: {str(e)}")
+            info = self.client.get_symbol_info(symbol)
+            if not info: raise ValueError(f"Symbol {symbol} not found")
+            return {"status": "success", "data": info}
+        except BinanceAPIException as e: raise Exception(f"API Error ({e.code}): {e.message}")
+        except Exception as e: raise Exception(f"Unexpected error: {str(e)}")
 
-    def place_order(self, symbol: str, side: str, order_type: str, quantity: float, price: float = None, stop_price: float = None): # Synchronous
+    def place_order(self, symbol: str, side: str, order_type: str, quantity: float, price: Optional[float] = None, stop_price: Optional[float] = None, client_order_id: Optional[str] = None):
         try:
-            symbol_data = self.client.get_symbol_info(symbol)
-            if not symbol_data:
-                raise ValueError(f"Trading pair {symbol} not found")
+            self.client.get_symbol_info(symbol)
+            params: Dict[str, Any] = {'symbol': symbol.upper(), 'side': side.upper(), 'quantity': quantity}
+            if client_order_id: params['newClientOrderId'] = client_order_id
 
-            # Placeholder for detailed validation logic (LOT_SIZE, MIN_NOTIONAL, PRICE_FILTER)
-            # Ensure quantity and price are formatted according to symbol rules using symbol_data['filters']
-
-            order_params = {
-                'symbol': symbol.upper(), 'side': side.upper(), 'quantity': quantity
-            }
             order_type_upper = order_type.upper()
+            # Ensure Binance ENUMs are used where appropriate for 'type'
+            if order_type_upper == "MARKET": params['type'] = ORDER_TYPE_MARKET
+            elif order_type_upper == "LIMIT": params['type'] = ORDER_TYPE_LIMIT
+            elif order_type_upper == "STOP_LOSS": params['type'] = ORDER_TYPE_STOP_LOSS
+            elif order_type_upper == "STOP_LOSS_LIMIT": params['type'] = ORDER_TYPE_STOP_LOSS_LIMIT
+            elif order_type_upper == "TAKE_PROFIT": params['type'] = ORDER_TYPE_TAKE_PROFIT
+            elif order_type_upper == "TAKE_PROFIT_LIMIT": params['type'] = ORDER_TYPE_TAKE_PROFIT_LIMIT
+            elif order_type_upper == "LIMIT_MAKER": params['type'] = ORDER_TYPE_LIMIT_MAKER
+            elif order_type_upper == "STOP_MARKET": params['type'] = ORDER_TYPE_STOP_LOSS # Custom mapping
+            else: raise ValueError(f"Unsupported order_type: {order_type}")
 
-            if order_type_upper == ORDER_TYPE_MARKET:
-                order_params['type'] = ORDER_TYPE_MARKET
-            elif order_type_upper == ORDER_TYPE_LIMIT:
-                if price is None: raise ValueError("Price is required for LIMIT orders.")
-                order_params.update({'type': ORDER_TYPE_LIMIT, 'timeInForce': TIME_IN_FORCE_GTC, 'price': self.client.format_price(symbol=symbol, price=price)})
-            elif order_type_upper == 'STOP_MARKET' or order_type_upper in [ORDER_TYPE_STOP_LOSS, ORDER_TYPE_STOP_LOSS_LIMIT, ORDER_TYPE_TAKE_PROFIT, ORDER_TYPE_TAKE_PROFIT_LIMIT]:
-                order_params['type'] = ORDER_TYPE_STOP_LOSS if order_type_upper == 'STOP_MARKET' else order_type_upper
-                if stop_price is None: raise ValueError("Stop price is required for this order type.")
-                order_params['stopPrice'] = self.client.format_price(symbol=symbol, price=stop_price)
-                if order_type_upper in [ORDER_TYPE_STOP_LOSS_LIMIT, ORDER_TYPE_TAKE_PROFIT_LIMIT]:
-                    if price is None: raise ValueError("Price is required for LIMIT-based stop/take profit orders.")
-                    order_params['price'] = self.client.format_price(symbol=symbol, price=price)
-                    order_params['timeInForce'] = TIME_IN_FORCE_GTC
-            else:
-                raise ValueError(f"Unsupported order type: {order_type}")
+            if order_type_upper in [ORDER_TYPE_LIMIT, ORDER_TYPE_STOP_LOSS_LIMIT, ORDER_TYPE_TAKE_PROFIT_LIMIT, ORDER_TYPE_LIMIT_MAKER]:
+                if price is None: raise ValueError(f"Price required for {order_type_upper}")
+                params['price'] = self.client.format_price(symbol=symbol, price=str(price))
+            if order_type_upper in [ORDER_TYPE_LIMIT, ORDER_TYPE_STOP_LOSS_LIMIT, ORDER_TYPE_TAKE_PROFIT_LIMIT]:
+                 params['timeInForce'] = TIME_IN_FORCE_GTC # Default for these
 
-            # Placeholder for MIN_NOTIONAL check
+            if order_type_upper in [ORDER_TYPE_STOP_LOSS, ORDER_TYPE_STOP_LOSS_LIMIT, ORDER_TYPE_TAKE_PROFIT, ORDER_TYPE_TAKE_PROFIT_LIMIT, "STOP_MARKET"]:
+                if stop_price is None: raise ValueError(f"Stop price required for {order_type_upper}")
+                params['stopPrice'] = self.client.format_price(symbol=symbol, price=str(stop_price))
 
-            self.logger.info(f"Attempting to place order with params: {order_params}")
-            new_order = self.client.create_order(**order_params)
-            self.logger.info(f"Order placed successfully: ID {new_order.get('orderId')}, Symbol {new_order.get('symbol')}, Status {new_order.get('status')}")
+            self.logger.info(f"Placing order: {params}")
+            new_order = self.client.create_order(**params)
             return {"status": "success", "order": new_order}
-        except BinanceAPIException as e:
-            self.logger.error(f"Binance API Error placing order for {symbol}: {str(e)} - Code: {e.code}, Message: {e.message}", exc_info=True)
-            raise Exception(f"Binance API Error ({e.code}): {e.message}")
-        except ValueError as e:
-            self.logger.warning(f"Validation Error placing order for {symbol}: {str(e)}", exc_info=True)
-            raise Exception(f"Validation Error: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Unexpected error placing order for {symbol}: {str(e)}", exc_info=True)
-            raise Exception(f"Unexpected Server Error: {str(e)}")
+        except BinanceAPIException as e: self.logger.error(f"Order error: {e}"); raise Exception(f"API Error ({e.code}): {e.message}")
+        except Exception as e: self.logger.error(f"Order error: {e}"); raise Exception(f"Error: {str(e)}")
 
-    def twap(self, symbol, side, total_qty, interval_sec, slices): # Synchronous
-        try:
-            placed_orders = []
-            if slices <= 0: raise ValueError("Number of slices must be greater than 0.")
-            if total_qty <= 0: raise ValueError("Total quantity must be greater than 0.")
-            if interval_sec <= 0: raise ValueError("Interval must be greater than 0.")
-            qty_per_order = round(total_qty / slices, 8) # TODO: Adjust precision based on symbol rules
-            self.logger.info(f"Starting TWAP strategy: symbol={symbol}, side={side}, total_qty={total_qty}, slices={slices}, interval={interval_sec}s, qty_per_slice={qty_per_order}")
-            for i in range(slices):
-                self.logger.info(f"TWAP: Executing slice {i+1}/{slices} for {qty_per_order} {symbol}")
-                try:
-                    order_result = self.place_order(symbol, side, 'MARKET', qty_per_order)
-                    if order_result and order_result.get('status') == 'success' and order_result.get('order'):
-                        placed_orders.append(order_result['order'])
-                        self.logger.info(f"TWAP slice {i+1}/{slices}: Order {order_result['order'].get('orderId')} placed.")
-                    else:
-                        error_detail = f"TWAP slice {i+1}/{slices}: Failed to place order or unexpected result. Result: {order_result}"
-                        self.logger.error(error_detail)
-                        raise Exception(error_detail)
-                except Exception as slice_e:
-                    self.logger.error(f"TWAP slice {i+1}/{slices} for {qty_per_order} {symbol} failed: {slice_e}", exc_info=True)
-                    raise Exception(f"TWAP strategy failed at slice {i+1}/{slices}. Error: {slice_e}")
-                if i < slices - 1:
-                    self.logger.info(f"TWAP: Sleeping for {interval_sec} seconds before next slice.")
-                    time.sleep(interval_sec)
-            self.logger.info(f"TWAP strategy execution completed for {symbol}. Placed {len(placed_orders)} orders.")
-            return {'status': 'success', 'message': 'TWAP execution completed successfully.', 'orders_placed': placed_orders}
-        except ValueError as ve:
-            self.logger.warning(f"TWAP strategy validation error for {symbol}: {ve}", exc_info=True)
-            raise ve
-        except Exception as e:
-            self.logger.error(f"TWAP strategy failed for {symbol}: {str(e)}", exc_info=True)
-            raise e
+    def twap(self, symbol: str, side: str, total_qty: float, interval_sec: int, slices: int):
+        self.logger.info(f"TWAP: {symbol}, side {side}, total_qty {total_qty}, slices {slices}, interval {interval_sec}s")
+        placed_orders_summary = []
+        qty_per_order = round(total_qty / slices, 8)
+        for i in range(slices):
+            client_order_id = f"twap_{symbol.lower()}_{side.lower()}_{int(time.time())}_{i+1}"
+            try:
+                order_result = self.place_order(symbol, side, "MARKET", qty_per_order, client_order_id=client_order_id)
+                placed_orders_summary.append(order_result.get("order", {}))
+            except Exception as e_slice:
+                self.logger.error(f"TWAP slice {i+1} failed: {e_slice}")
+                placed_orders_summary.append({"error": str(e_slice), "slice": i+1, "client_order_id": client_order_id})
+            if i < slices - 1: time.sleep(interval_sec)
+        return {'status': 'success', 'message': 'TWAP execution attempted.', 'orders_placed': placed_orders_summary}
 
-    def grid(self, symbol, lower_price, upper_price, grids, quantity, side): # Synchronous
-        try:
-            placed_orders = []
-            if grids <= 1: raise ValueError("Number of grid levels must be at least 2.")
-            if lower_price >= upper_price: raise ValueError("Lower price must be less than upper price.")
-            if quantity <= 0: raise ValueError("Quantity per grid must be greater than 0.")
-            price_step = (upper_price - lower_price) / (grids - 1)
-            self.logger.info(f"Starting Grid: {symbol}, side={side}, range=[{lower_price}-{upper_price}], grids={grids}, qty_per_grid={quantity}, step={price_step}")
-            for i in range(grids):
-                price = round(lower_price + i * price_step, 8) # TODO: Adjust precision based on symbol rules
-                self.logger.info(f"Grid: Placing LIMIT {side} order {i+1}/{grids} at price {price} for {quantity} {symbol}")
-                try:
-                    order_result = self.place_order(symbol, side, 'LIMIT', quantity, price=price)
-                    if order_result and order_result.get('status') == 'success' and order_result.get('order'):
-                        placed_orders.append(order_result['order'])
-                        self.logger.info(f"Grid order {i+1}/{grids}: ID {order_result['order'].get('orderId')} placed at {price}.")
-                    else:
-                        error_detail = f"Grid order {i+1}/{grids}: Failed to place order at {price}. Result: {order_result}"
-                        self.logger.error(error_detail)
-                        raise Exception(error_detail)
-                except Exception as slice_e:
-                    self.logger.error(f"Grid order {i+1}/{grids} at {price} for {quantity} {symbol} failed: {slice_e}", exc_info=True)
-                    raise Exception(f"Grid strategy failed at order {i+1}/{grids} (price {price}). Error: {slice_e}")
-            self.logger.info(f"Grid setup completed for {symbol}. Placed {len(placed_orders)} orders.")
-            return {'status': 'success', 'message': 'Grid setup completed successfully.', 'orders_placed': placed_orders}
-        except ValueError as ve:
-            self.logger.warning(f"Grid strategy validation error for {symbol}: {ve}", exc_info=True)
-            raise ve
-        except Exception as e:
-            self.logger.error(f"Grid strategy failed for {symbol}: {str(e)}", exc_info=True)
-            raise e
+    def grid(self, symbol: str, lower_price: float, upper_price: float, grids: int, quantity: float, side: str):
+        self.logger.info(f"Grid: {symbol}, side {side}, range {lower_price}-{upper_price}, grids {grids}, qty {quantity}")
+        placed_orders_summary = []
+        if grids <= 1: raise ValueError("Grids must be > 1")
+        price_step = (upper_price - lower_price) / (grids - 1)
+        for i in range(grids):
+            price = round(lower_price + i * price_step, 8)
+            client_order_id = f"grid_{symbol.lower()}_{side.lower()}_{int(time.time())}_{i+1}"
+            try:
+                order_result = self.place_order(symbol, side, "LIMIT", quantity, price=price, client_order_id=client_order_id)
+                placed_orders_summary.append(order_result.get("order", {}))
+            except Exception as e_slice:
+                self.logger.error(f"Grid order {i+1} at {price} failed: {e_slice}")
+                placed_orders_summary.append({"error": str(e_slice), "slice": i+1, "price":price, "client_order_id": client_order_id})
+        return {'status': 'success', 'message': 'Grid setup attempted.', 'orders_placed': placed_orders_summary}
 
-    # --- WebSocket Management Methods ---
-    async def add_websocket_client(self, websocket: Any): # Param type is FastAPI's WebSocket
+    async def add_websocket_client(self, websocket: Any):
         async with self._lock:
-            if websocket not in self.active_websockets:
-                self.active_websockets.append(websocket)
-                self.logger.info(f"WebSocket client added. Total clients: {len(self.active_websockets)}")
-        if len(self.active_websockets) == 1 and not self.user_data_stream_started: # If first client
-            await self.start_user_data_stream()
+            if websocket not in self.active_websockets: self.active_websockets.append(websocket)
+            self.logger.info(f"WS client added. Total: {len(self.active_websockets)}")
 
     async def remove_websocket_client(self, websocket: Any):
         async with self._lock:
-            if websocket in self.active_websockets:
-                self.active_websockets.remove(websocket)
-                self.logger.info(f"WebSocket client removed. Total clients: {len(self.active_websockets)}")
-        if not self.active_websockets and self.user_data_stream_started: # If last client
-            self.logger.info("No active WebSocket clients left. Stopping user data stream.")
+            if websocket in self.active_websockets: self.active_websockets.remove(websocket)
+            self.logger.info(f"WS client removed. Total: {len(self.active_websockets)}")
+        if not self.active_websockets and self.user_data_stream_started:
             await self.stop_user_data_stream()
 
     async def broadcast_to_clients(self, message_data: Dict[str, Any]):
         if not self.active_websockets: return
-        self.logger.debug(f"Broadcasting to {len(self.active_websockets)} clients: {message_data}")
         clients_to_remove = []
-        for client_ws in list(self.active_websockets): # Iterate over a copy for safe removal
-            try:
-                await client_ws.send_json(message_data)
-            except Exception as e: # Catches WebSocketDisconnect, ConnectionClosed, etc.
-                self.logger.error(f"Error sending to client {client_ws}: {e}. Marking for removal.")
-                clients_to_remove.append(client_ws)
+        for client_ws in list(self.active_websockets):
+            try: await client_ws.send_json(message_data)
+            except Exception as e: clients_to_remove.append(client_ws); self.logger.error(f"WS send error to {client_ws}: {e}")
         if clients_to_remove:
             async with self._lock:
                 for client_ws in clients_to_remove:
                     if client_ws in self.active_websockets: self.active_websockets.remove(client_ws)
-                self.logger.info(f"Removed {len(clients_to_remove)} unresponsive/disconnected WebSocket clients.")
 
     def _process_user_data_message(self, msg: Dict[str, Any]):
-        self.logger.debug(f"User stream raw msg in TWM thread: {msg}")
+        key_ref = self.stream_user_binance_api_key_ref[-4:] if self.stream_user_binance_api_key_ref and len(self.stream_user_binance_api_key_ref) >= 4 else 'N/A'
+        self.logger.debug(f"WS UserMsg (User: {self.stream_user_id}, KeyRef: ...{key_ref}): {msg.get('e')}")
         event_type = msg.get('e')
-        processed_message = None
+        broadcast_msg = None
+
         if event_type == 'error':
-            self.logger.error(f"User data stream error (Binance): {msg.get('m')}")
-            processed_message = {"type": "error", "data": msg}
+            broadcast_msg = {"type": "error", "data": msg, "message": msg.get('m')}
         elif event_type == 'executionReport':
-            self.logger.info(f"Processing executionReport: OrderID {msg.get('i')}, Symbol {msg.get('s')}, Status {msg.get('X')}")
-            processed_message = {
-                'type': 'order_update', 'orderId': msg.get('i'), 'symbol': msg.get('s'),
-                'side': msg.get('S'), 'orderType': msg.get('o'), 'status': msg.get('X'),
-                'quantity': msg.get('q'), 'price': msg.get('p'),
-                'executedQuantity': msg.get('z'), 'lastExecutedPrice': msg.get('L'),
-                'commission': msg.get('n'), 'commissionAsset': msg.get('N'),
-                'transactionTime': msg.get('T'), 'orderTime': msg.get('O')
-            }
+            order_id = str(msg.get('i')); status = msg.get('X')
+            broadcast_msg = {'type': 'order_update', 'orderId': order_id, 'symbol': msg.get('s'),
+                'side': msg.get('S'), 'orderType': msg.get('o'), 'status': status,
+                'quantity': str(msg.get('q')), 'price': str(msg.get('p')),
+                'executedQuantity': str(msg.get('z')), 'lastExecutedPrice': str(msg.get('L')),
+                'commission': str(msg.get('n')) if msg.get('n') is not None else None,
+                'commissionAsset': msg.get('N'), 'transactionTime': int(msg.get('T')),
+                'orderTime': int(msg.get('O')) }
+            if status == 'FILLED':
+                if self.stream_user_id and self.stream_user_api_key_id is not None:
+                    db: Optional[Session] = None
+                    try:
+                        db = SessionLocal()
+                        avg_price = msg.get('ap', '0'); price_val = msg.get('L', '0')
+                        if not avg_price or Decimal(avg_price) == Decimal('0'): avg_price = price_val
+                        trade_input = {
+                            "binance_order_id": order_id, "symbol": msg.get('s'),
+                            "side": msg.get('S'), "order_type": msg.get('o'), "status": status,
+                            "quantity_ordered": Decimal(str(msg.get('q'))), "quantity_filled": Decimal(str(msg.get('z'))),
+                            "price_ordered": Decimal(str(msg.get('p'))) if msg.get('p') and msg.get('p') != '0' else None,
+                            "price_avg_filled": Decimal(avg_price) if avg_price and avg_price != '0' else None,
+                            "commission_amount": Decimal(str(msg.get('n'))) if msg.get('n') is not None else None,
+                            "commission_asset": msg.get('N'),
+                            "transaction_time": datetime.fromtimestamp(int(msg.get('T')) / 1000.0),
+                            "user_api_key_id": self.stream_user_api_key_id,
+                            "client_order_id": msg.get('c'), "time_in_force": msg.get('f'),
+                            "notes": f"WS Log. OrderListId: {msg.get('g')}"}
+                        trade_schema = TradeCreate(**trade_input)
+                        if not trade_service.get_trade_by_binance_order_id(db, user_id=self.stream_user_id, binance_order_id=order_id):
+                            trade_service.log_trade(db, user_id=self.stream_user_id, trade_data=trade_schema)
+                            self.logger.info(f"Logged FILLED trade via WS: User {self.stream_user_id}, Order {order_id}")
+                        else: self.logger.info(f"FILLED trade via WS already logged: User {self.stream_user_id}, Order {order_id}")
+                    except Exception as e_log: self.logger.error(f"DB log error for FILLED order {order_id}: {e_log}", exc_info=True)
+                    finally:
+                        if db: db.close()
+                else: self.logger.warning(f"FILLED Order {order_id} on WS, but no stream_user_id/api_key_id. Not logged.")
         elif event_type == 'outboundAccountPosition':
-            self.logger.info("Processing outboundAccountPosition (balance update).")
-            active_balances = [
-                {'asset': b.get('a'), 'free': b.get('f'), 'locked': b.get('l')}
-                for b in msg.get('B', [])
-                if float(b.get('f',0.0)) > 0 or float(b.get('l',0.0)) > 0
-            ]
-            if active_balances:
-                 processed_message = {'type': 'balance_update', 'balances': active_balances}
-            else:
-                self.logger.debug("Balance update received, but no non-zero balances to report.")
-
-        if processed_message:
+            balances = [{'asset':b.get('a'),'free':str(b.get('f','0')),'locked':str(b.get('l','0'))}
+                        for b in msg.get('B',[]) if float(b.get('f','0'))>0 or float(b.get('l','0'))>0]
+            if balances: broadcast_msg = {'type':'balance_update','balances':balances}
+        if broadcast_msg:
             try:
-                loop = asyncio.get_event_loop() # Get main thread's event loop
-                if loop.is_running():
-                    asyncio.run_coroutine_threadsafe(self.broadcast_to_clients(processed_message), loop)
-                else:
-                    self.logger.warning("Main event loop not running. Cannot broadcast from TWM.")
-            except RuntimeError: # If called from a thread without a current event loop set by asyncio.set_event_loop()
-                 self.logger.error("RuntimeError: No current event loop in TWM thread for broadcast scheduling.")
-            except Exception as e_broadcast:
-                self.logger.error(f"Exception during TWM message broadcast scheduling: {e_broadcast}", exc_info=True)
+                loop = asyncio.get_event_loop();
+                if loop.is_running(): asyncio.run_coroutine_threadsafe(self.broadcast_to_clients(broadcast_msg), loop)
+            except Exception as e_bc: self.logger.error(f"WS broadcast schedule error: {e_bc}", exc_info=True)
 
-    async def start_user_data_stream(self):
+    async def start_user_data_stream(self, user_id: uuid.UUID, user_api_key_id: int, api_key: str, api_secret: str):
         async with self._lock:
-            if self.user_data_stream_started:
-                self.logger.info("User data stream start requested, but already running.")
-                return
-            self.logger.info("Attempting to start Binance User Data Stream...")
+            new_key_ref = api_key[-4:] if api_key and len(api_key) >=4 else "N/A"
+            if self.user_data_stream_started and self.stream_user_binance_api_key_ref == new_key_ref and self.stream_user_id == user_id:
+                self.stream_user_api_key_id = user_api_key_id; return
+            if self.user_data_stream_started: await self._stop_twm_resources_locked()
+            self.logger.info(f"Starting WS data stream for User {user_id}, UserAPIKey.id {user_api_key_id} (Key ...{new_key_ref})")
             try:
-                if self.twm is not None: # Should ideally be None here
-                    self.logger.warning("TWM instance found during start. Attempting to stop old one.")
-                    self.twm.stop(); self.twm.join(timeout=2)
+                self.stream_user_id, self.stream_user_api_key_id, self.stream_user_binance_api_key_ref = user_id, user_api_key_id, new_key_ref
+                self.twm = ThreadedWebsocketManager(api_key=api_key, api_secret=api_secret, testnet=True)
+                self.twm.start(); self.user_data_stream_key = self.twm.start_user_socket(callback=self._process_user_data_message)
+                if self.user_data_stream_key: self.user_data_stream_started = True; self.logger.info(f"User Data Stream started for User {user_id}.")
+                else: await self._stop_twm_resources_locked(); self.logger.error(f"Failed to start User Data Stream (no key) for User {user_id}.")
+            except Exception as e: await self._stop_twm_resources_locked(); self.logger.error(f"Error starting User Data Stream for User {user_id}: {e}", exc_info=True)
 
-                self.twm = ThreadedWebsocketManager(api_key=API_KEY, api_secret=API_SECRET, testnet=True)
-                self.twm.start() # Starts the TWM's own processing thread
-                self.user_data_stream_key = self.twm.start_user_socket(callback=self._process_user_data_message)
+    async def _stop_twm_resources_locked(self): # Assumes lock is held
+        if self.twm:
+            if self.user_data_stream_key:
+                try: self.twm.stop_socket(self.user_data_stream_key)
+                except Exception as e: self.logger.error(f"TWM stop_socket error: {e}")
+            try: self.twm.join(timeout=1)
+            except Exception as e: self.logger.error(f"TWM join error: {e}")
+            self.twm = None
+        self.user_data_stream_key, self.user_data_stream_started = None, False
+        key_ref = self.stream_user_binance_api_key_ref[-4:] if self.stream_user_binance_api_key_ref and len(self.stream_user_binance_api_key_ref) >=4 else 'N/A'
+        self.logger.info(f"TWM resources stopped for User {self.stream_user_id}, KeyRef ...{key_ref}")
 
-                if self.user_data_stream_key:
-                    self.user_data_stream_started = True
-                    self.logger.info(f"User Data Stream started successfully. Stream Key: {self.user_data_stream_key}")
-                else:
-                    self.logger.error("Failed to start User Data Stream: TWM did not return a stream key.")
-                    if self.twm: self.twm.stop(); self.twm = None # Clean up TWM
-            except Exception as e:
-                self.logger.error(f"Error starting User Data Stream: {e}", exc_info=True)
-                if self.twm: self.twm.stop(); self.twm = None
-                self.user_data_stream_started = False
-
-    async def stop_user_data_stream(self):
+    async def stop_user_data_stream(self): # Public method to stop and clear context
         async with self._lock:
-            if not self.user_data_stream_started or not self.twm:
-                self.logger.info("User data stream stop requested, but not running or TWM not initialized.")
-                return
+            if not self.user_data_stream_started: return
+            await self._stop_twm_resources_locked()
+            self.stream_user_id, self.stream_user_api_key_id, self.stream_user_binance_api_key_ref = None, None, None
+            self.logger.info("User stream context fully cleared after explicit stop.")
 
-            self.logger.info(f"Attempting to stop User Data Stream: {self.user_data_stream_key}...")
-            try:
-                if self.user_data_stream_key:
-                    stopped = self.twm.stop_socket(self.user_data_stream_key)
-                    self.logger.info(f"TWM stop_socket call for {self.user_data_stream_key} returned: {stopped}")
-
-                self.twm.join(timeout=5) # Wait for TWM thread to finish
-
-                self.user_data_stream_key = None
-                self.user_data_stream_started = False
-                self.twm = None # Clear the TWM instance
-                self.logger.info("User Data Stream stopped and TWM instance cleared.")
-            except Exception as e:
-                self.logger.error(f"Error stopping User Data Stream or TWM: {e}", exc_info=True)
-                # Mark as not started even if there was an error during stop
-                self.user_data_stream_started = False
-                self.twm = None
 ```
+
+Now, for `trading_bot_backend/main.py`:

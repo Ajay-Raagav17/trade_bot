@@ -1,4 +1,10 @@
+Alembic
+SQLAlchemy
+cryptography
 fastapi
-uvicorn
+httpx
+psycopg2-binary
 python-binance
 python-dotenv
+python-jose[cryptography]
+uvicorn
