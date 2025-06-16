@@ -1,0 +1,157 @@
+"use client";
+
+import React, { useState, FormEvent } from 'react';
+import { apiClient } from '@/lib/apiClient';
+
+interface OrderDetail {
+  orderId?: string;
+  symbol?: string;
+  price?: string;
+  origQty?: string;
+  executedQty?: string;
+  status?: string;
+}
+
+interface StrategyResponse {
+  status: string;
+  message?: string;
+  orders_placed?: OrderDetail[];
+}
+
+export default function GridForm() {
+  const [symbol, setSymbol] = useState('BTCUSDT');
+  const [lowerPrice, setLowerPrice] = useState('');
+  const [upperPrice, setUpperPrice] = useState('');
+  const [grids, setGrids] = useState(''); // Number of grid lines
+  const [quantityPerGrid, setQuantityPerGrid] = useState('');
+  const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
+
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [responseMessage, setResponseMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [placedOrders, setPlacedOrders] = useState<OrderDetail[]>([]);
+
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setResponseMessage(null);
+    setErrorMessage(null);
+    setPlacedOrders([]);
+
+    const payload = {
+      symbol: symbol.toUpperCase(),
+      lowerPrice: parseFloat(lowerPrice),
+      upperPrice: parseFloat(upperPrice),
+      grids: parseInt(grids, 10),
+      quantityPerGrid: parseFloat(quantityPerGrid),
+      side,
+    };
+
+    if (!payload.symbol) {
+        setErrorMessage('Symbol is required.');
+        setIsLoading(false);
+        return;
+    }
+    if (isNaN(payload.lowerPrice) || payload.lowerPrice <= 0 ||
+        isNaN(payload.upperPrice) || payload.upperPrice <= 0 ||
+        isNaN(payload.grids) || payload.grids < 2 ||
+        isNaN(payload.quantityPerGrid) || payload.quantityPerGrid <= 0) {
+      setErrorMessage('Please enter valid positive numbers for prices, grids (min 2), and quantity.');
+      setIsLoading(false);
+      return;
+    }
+    if (payload.lowerPrice >= payload.upperPrice) {
+        setErrorMessage('Lower price must be strictly less than upper price.');
+        setIsLoading(false);
+        return;
+    }
+
+    try {
+      const response = await apiClient<StrategyResponse>('/strategies/grid', {
+        method: 'POST',
+        body: payload,
+      });
+      setResponseMessage(response.message || `Grid strategy initiated: ${response.status}`);
+      if(response.orders_placed) {
+        setPlacedOrders(response.orders_placed);
+      }
+    } catch (err: any) {
+      console.error('Grid strategy initiation failed:', err);
+      setErrorMessage(err.data?.detail || err.message || 'Failed to initiate Grid strategy.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-6 bg-gray-800 rounded-xl shadow-2xl space-y-5 max-w-lg mx-auto">
+      <h3 className="text-xl font-semibold text-teal-400 mb-4 text-center">Grid Trading Strategy</h3>
+
+      <div>
+        <label htmlFor="grid-symbol" className="block text-sm font-medium text-gray-300">Symbol</label>
+        <input type="text" id="grid-symbol" value={symbol} onChange={(e) => setSymbol(e.target.value)}
+               className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm text-white placeholder-gray-500"
+               placeholder="e.g., BTCUSDT" required />
+      </div>
+
+      <div>
+        <label htmlFor="grid-lowerPrice" className="block text-sm font-medium text-gray-300">Lower Price</label>
+        <input type="number" id="grid-lowerPrice" value={lowerPrice} onChange={(e) => setLowerPrice(e.target.value)}
+               className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm text-white placeholder-gray-500"
+               placeholder="e.g., 48000" step="any" required />
+      </div>
+
+      <div>
+        <label htmlFor="grid-upperPrice" className="block text-sm font-medium text-gray-300">Upper Price</label>
+        <input type="number" id="grid-upperPrice" value={upperPrice} onChange={(e) => setUpperPrice(e.target.value)}
+               className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm text-white placeholder-gray-500"
+               placeholder="e.g., 52000" step="any" required />
+      </div>
+
+      <div>
+        <label htmlFor="grid-grids" className="block text-sm font-medium text-gray-300">Number of Grid Lines</label>
+        <input type="number" id="grid-grids" value={grids} onChange={(e) => setGrids(e.target.value)}
+               className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm text-white placeholder-gray-500"
+               placeholder="e.g., 10 (min 2)" step="1" min="2" required />
+      </div>
+
+      <div>
+        <label htmlFor="grid-quantityPerGrid" className="block text-sm font-medium text-gray-300">Quantity Per Grid Order</label>
+        <input type="number" id="grid-quantityPerGrid" value={quantityPerGrid} onChange={(e) => setQuantityPerGrid(e.target.value)}
+               className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm text-white placeholder-gray-500"
+               placeholder="e.g., 0.001" step="any" required />
+      </div>
+
+      <div>
+        <label htmlFor="grid-side" className="block text-sm font-medium text-gray-300">Order Side in Grid</label>
+        <select id="grid-side" value={side} onChange={(e) => setSide(e.target.value as 'BUY' | 'SELL')}
+                className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm text-white">
+          <option value="BUY">Buy</option>
+          <option value="SELL">Sell</option>
+        </select>
+        <p className="mt-1 text-xs text-gray-400">Defines if orders in the grid are BUY or SELL limits.</p>
+      </div>
+
+      <button type="submit" disabled={isLoading}
+              className="w-full py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-teal-500 disabled:opacity-60 transition duration-150 ease-in-out">
+        {isLoading ? 'Initiating Grid...' : 'Start Grid Strategy'}
+      </button>
+
+      {responseMessage && <p className="mt-4 text-sm text-green-300 text-center bg-green-800 bg-opacity-40 p-3 rounded-md">{responseMessage}</p>}
+      {errorMessage {errorMessage && <p className="mt-4 text-sm text-red-300 text-center bg-red-800 bg-opacity-40 p-3 rounded-md">{errorMessage && <p className="mt-4 text-sm text-red-300 text-center bg-red-800 bg-opacity-40 p-3 rounded-md"> <p className="feedback-error">{errorMessage}</p>}
+
+      {placedOrders.length > 0 && (
+        <div className="mt-4 p-3 bg-gray-750 rounded-md max-h-40 overflow-y-auto">
+          <h4 className="text-md font-semibold text-gray-200 mb-2">Orders Placed:</h4>
+          <ul className="list-disc list-inside text-xs text-gray-300">
+            {placedOrders.map((order, index) => (
+              <li key={order.orderId || index}>ID: {order.orderId || 'N/A'}, Price: {order.price}, Qty: {order.origQty}, Status: {order.status}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </form>
+  );
+}

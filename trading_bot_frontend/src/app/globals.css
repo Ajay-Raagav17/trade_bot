@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-rgb: 255, 255, 255; /* Default light background */
+  --foreground-rgb: 23, 23, 23;   /* Default light foreground */
+
+  /* Example: Define other global CSS variables if needed for your theme */
+  /* --primary-color: 0, 122, 255; */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background-rgb: 10, 10, 10;    /* Default dark background */
+    --foreground-rgb: 237, 237, 237; /* Default dark foreground */
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  /* Default fonts are usually handled by Tailwind's base styles (e.g., font-sans)
+     or explicitly in layout.tsx/page.tsx using next/font for optimized fonts. */
+}
+
+/* You can add any other global base styles below */
+
+/* Simple CSS Spinner */
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.2); /* Lighter border for dark bg */
+  border-radius: 50%;
+  border-top-color: #6366F1; /* brand-primary */
+  width: 1em;
+  height: 1em;
+  animation: spin 0.8s linear infinite; /* Faster spin */
+  display: inline-block;
+  margin-right: 0.75em; /* Increased margin */
+  vertical-align: -0.125em; /* Align better with text */
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Utility classes for feedback messages for consistency */
+.feedback-message {
+  @apply mt-4 text-sm text-center p-3 rounded-lg shadow; /* Base styling */
+}
+.feedback-success {
+  @apply feedback-message bg-brand-secondary bg-opacity-20 text-green-300 border border-brand-secondary;
+}
+.feedback-error {
+  @apply feedback-message bg-red-700 bg-opacity-20 text-red-300 border border-red-500;
+}

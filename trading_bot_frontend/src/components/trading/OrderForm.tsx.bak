@@ -1,0 +1,195 @@
+"use client";
+
+import React, { useState, FormEvent } from 'react';
+import { apiClient } from '@/lib/apiClient';
+
+interface OrderFormProps {
+  symbol: string;
+}
+
+type OrderType = "MARKET" | "LIMIT" | "STOP_MARKET";
+
+interface OrderResponseData { // Corresponds to the 'order' field in BotResponse from backend
+  orderId?: number;
+  symbol?: string;
+  status?: string;
+  // Add other relevant fields from actual Binance order object
+  [key: string]: any;
+}
+interface BotResponse { // From backend main.py
+    status: string;
+    message?: string;
+    order?: OrderResponseData;
+}
+
+
+export default function OrderForm({ symbol }: OrderFormProps) {
+  const [orderType, setOrderType] = useState<OrderType>("MARKET");
+  const [side, setSide] = useState<"BUY" | "SELL">("BUY");
+  const [quantity, setQuantity] = useState('');
+  const [price, setPrice] = useState('');
+  const [stopPrice, setStopPrice] = useState('');
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [responseMessage, setResponseMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setResponseMessage(null);
+    setErrorMessage(null);
+
+    if (!symbol || symbol.trim() === "") {
+        setErrorMessage("Symbol is required to place an order.");
+        setIsLoading(false);
+        return;
+    }
+
+    let endpoint = '';
+    let payload: any = {
+      symbol: symbol.toUpperCase(),
+      side,
+      quantity: parseFloat(quantity),
+    };
+
+    switch (orderType) {
+      case 'MARKET':
+        endpoint = '/orders/market';
+        break;
+      case 'LIMIT':
+        endpoint = '/orders/limit';
+        payload.price = parseFloat(price);
+        if (isNaN(payload.price) || payload.price <= 0) {
+            setErrorMessage("A valid positive price is required for LIMIT orders.");
+            setIsLoading(false);
+            return;
+        }
+        break;
+      case 'STOP_MARKET':
+        endpoint = '/orders/stop-market';
+        payload.stop_price = parseFloat(stopPrice); // Ensure backend expects 'stop_price'
+         if (isNaN(payload.stop_price) || payload.stop_price <= 0) {
+            setErrorMessage("A valid positive stop price is required for STOP_MARKET orders.");
+            setIsLoading(false);
+            return;
+        }
+        break;
+      default:
+        setErrorMessage('Invalid order type selected.');
+        setIsLoading(false);
+        return;
+    }
+
+    if (isNaN(payload.quantity) || payload.quantity <= 0) {
+        setErrorMessage("A valid positive quantity is required.");
+        setIsLoading(false);
+        return;
+    }
+
+    try {
+      const response = await apiClient<BotResponse>(endpoint, { // Expect BotResponse structure
+        method: 'POST',
+        body: payload,
+      });
+      // Backend BotResponse has `message` and `order` fields
+      setResponseMessage(response.message || `Order status: ${response.order?.status || 'Unknown'}. ID: ${response.order?.orderId || 'N/A'}`);
+    } catch (err: any) {
+      console.error('Order placement failed:', err);
+      setErrorMessage(err.data?.detail || err.message || 'Failed to place order. Check console for details.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-6 bg-gray-800 rounded-xl shadow-2xl space-y-6 max-w-lg mx-auto">
+      <h3 className="text-xl font-semibold text-indigo-300 mb-1 text-center">Place New Order</h3>
+      <p className="text-center text-gray-400 text-sm mb-4">For Symbol: <span className="font-bold text-white">{symbol.toUpperCase() || "N/A"}</span></p>
+
+      <div>
+        <label htmlFor="orderTypeSelect" className="block text-sm font-medium text-gray-300 mb-1">Order Type</label>
+        <select
+          id="orderTypeSelect"
+          value={orderType}
+          onChange={(e) => { setOrderType(e.target.value as OrderType); setPrice(''); setStopPrice(''); /* Clear conditional fields */}}
+          className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white"
+        >
+          <option value="MARKET">Market</option>
+          <option value="LIMIT">Limit</option>
+          <option value="STOP_MARKET">Stop Market</option>
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="sideSelect" className="block text-sm font-medium text-gray-300 mb-1">Side</label>
+        <select
+          id="sideSelect"
+          value={side}
+          onChange={(e) => setSide(e.target.value as "BUY" | "SELL")}
+          className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white"
+        >
+          <option value="BUY">Buy</option>
+          <option value="SELL">Sell</option>
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="quantity" className="block text-sm font-medium text-gray-300">Quantity</label>
+        <input
+          type="number"
+          id="quantity"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white placeholder-gray-500"
+          placeholder="e.g., 0.001"
+          step="any"
+          required
+        />
+      </div>
+
+      {orderType === 'LIMIT' && (
+        <div>
+          <label htmlFor="price" className="block text-sm font-medium text-gray-300">Price (for LIMIT order)</label>
+          <input
+            type="number"
+            id="price"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white placeholder-gray-500"
+            placeholder="e.g., 50000"
+            step="any"
+            required
+          />
+        </div>
+      )}
+
+      {orderType === 'STOP_MARKET' && (
+        <div>
+          <label htmlFor="stopPrice" className="block text-sm font-medium text-gray-300">Stop Price (for STOP_MARKET)</label>
+          <input
+            type="number"
+            id="stopPrice"
+            value={stopPrice}
+            onChange={(e) => setStopPrice(e.target.value)}
+            className="mt-1 block w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white placeholder-gray-500"
+            placeholder="e.g., 49000"
+            step="any"
+            required
+          />
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={isLoading || !symbol || !symbol.trim()}
+        className="w-full py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 disabled:opacity-60 transition duration-150 ease-in-out"
+      >
+        {isLoading ? 'Processing...' : `Place ${orderType} ${side} Order`}
+      </button>
+
+      {responseMessage && <p className="feedback-success">{responseMessage}</p>}
+      {errorMessage && <p className="mt-4 text-sm text-red-300 text-center bg-red-800 bg-opacity-40 p-3 rounded-md">{errorMessage}</p>}
+    </form>
+  );
+}
