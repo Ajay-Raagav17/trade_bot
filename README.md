@@ -1,132 +1,173 @@
-# Binance Trading Bot (Testnet Edition)
+  Full-Stack Binance Trading Bot Web Application
 
-A Python-based trading bot for Binance that provides various trading functionalities through an interactive command-line interface. This bot runs on Binance's testnet, making it safe for learning and testing trading strategies without risking real money.
+A full-stack trading bot platform using **FastAPI** for the backend, **Next.js** for the frontend, and Supabase for PostgreSQL and user authentication. Designed to simulate real-time trading on the Binance **Testnet**.
 
-## Features
+ Key Features
+- 🔐 User Authentication** via Supabase.
+- 🔑 Secure Binance API Key Management (encrypted per user).
+- 💹 Trading Operations (Market, Limit, Stop orders).
+- 📊 Advanced Strategies:
+  - TWAP (Time-Weighted Average Price)
+  - Grid Trading
+- 📈 Real-Time Dashboard** for balances & strategy updates (WebSocket).
+- 📚 Auto-generated API docs** with Swagger & ReDoc.
 
-- **Multiple Order Types:**
-  - Market Orders: Instant execution at current market price
-  - Limit Orders: Place orders at specific price levels
-  - Stop Market Orders: Automated market orders triggered at specified price levels
+⚙️ Tech Stack
 
-- **Advanced Trading Strategies:**
-  - TWAP (Time-Weighted Average Price): Split large orders into smaller ones over time
-  - Grid Trading: Automated buying and selling at predefined price intervals
+| Layer      | Tech                                   |
+|------------|----------------------------------------|
+| Backend    | FastAPI, SQLAlchemy, python-binance    |
+| Frontend   | Next.js 13+, Tailwind CSS, Supabase JS |
+| Database   | Supabase PostgreSQL                    |
+| Auth       | Supabase Auth (JWT)                    |
+| Realtime   | WebSocket via FastAPI                  |
+| Dev Tools  | Docker, Alembic, Fernet (Encryption)   |
 
-- **Account Management:**
-  - Real-time account balance viewing
-  - Order tracking and history
-  - Trade logging system
 
-- **User Interface:**
-  - Rich CLI interface with colored output
-  - Interactive prompts for trade parameters
-  - Clear error messages and validation
-  - Real-time order status updates
+ 📐 Architecture
+mermaid
+graph TD
+  FE[Frontend: Next.js] -->|REST + WS| BE[Backend: FastAPI]
+  BE --> DB[(Supabase PostgreSQL)]
+  FE --> SupabaseAuth[Supabase Auth]
 
-## Prerequisites
+ 📁 Project Structure
 
-- Python 3.8 or higher
-- Binance Testnet Account
-- API Key and Secret from Binance Testnet
 
-## Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd binance-trading-bot
+.
+├── trading_bot_backend/
+│   ├── api/
+│   ├── bot/
+│   ├── schemas/
+│   ├── services/
+│   ├── utils/
+│   ├── database.py
+│   ├── main.py
+│   ├── models.py
+│   └── requirements.txt
+│
+├── trading_bot_frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   └── schemas/
+│   ├── public/
+│   ├── package.json
+│   └── tailwind.config.ts
+│
+└── README.md
 ```
 
-2. Install required packages:
+ ✅ Prerequisites
+
+- Python 3.10+
+- Node.js (LTS)
+- Supabase Project
+- Binance Testnet account
+- `openssl` or Python for encryption key generation
+
+
+
+ 🚀 Setup & Installation
+
+🔧 1. Supabase Setup
+
+- Create a Supabase project at [supabase.com](https://supabase.com)
+- Get:
+  - `DATABASE_URL` (Connection string)
+  - `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+  - `JWKS_URI`, `JWT_ISSUER`, `JWT_AUDIENCE` (Auth config)
+- Enable **Email Auth** under `Authentication > Providers`
+
+
+
+ 🐍 2. Backend Setup
 ```bash
+cd trading_bot_backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. Set up your API credentials:
-   - Create a file named `env.py` with your Binance Testnet API credentials:
-```python
-API_KEY = "your_api_key"
-API_SECRET = "your_api_secret"
+Set environment variables** (via `.env` or OS env vars):
+env
+DATABASE_URL=...
+SECRET_ENCRYPTION_KEY=...  # Use Fernet generator
+SUPABASE_URL=...
+SUPABASE_JWKS_URI=...
+SUPABASE_JWT_ISSUER=...
+SUPABASE_JWT_AUDIENCE=authenticated
+🧱 Database Migrations
+
+bash
+alembic upgrade head
+
+ ⚛️ 3. Frontend Setup
+
+bash
+cd trading_bot_frontend
+npm install
+
+Create `.env.local`:
+env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws/updates
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-key
 ```
-Now already created and attached in env file
-## Usage
+ 🧪 Run the App Locally
 
-1. Start the bot:
-```bash
-python codebase.py
-```
+- **Backend:**  
+  ```bash
+  cd trading_bot_backend
+  uvicorn main:app --reload --port 8000
+  ```
 
-2. Choose from available trading modes:
-   - MARKET: For immediate execution
-   - LIMIT: Set buy/sell orders at specific prices
-   - STOP_MARKET: Set trigger prices for market orders
-   - TWAP: Execute large orders over time
-   - GRID: Set up grid trading strategy
-   - ACCOUNT: View your account balances
-   - EXIT: Close the program
+- **Frontend:**  
+  ```bash
+  cd trading_bot_frontend
+  npm run dev
+  ```
 
-3. Follow the interactive prompts to:
-   - Select trading pairs
-   - Enter order quantities
-   - Set prices (for limit orders)
-   - Configure strategy parameters
+📘 API Docs
 
-## Trading Modes Explained
+- Swagger: [`/docs`](http://localhost:8000/docs)
+- ReDoc: [`/redoc`](http://localhost:8000/redoc)
 
-### Market Order
-- Instant execution at the current market price
-- Best for immediate trades
-- No price guarantee
+---
 
-### Limit Order
-- Set your desired price
-- Order executes only when market reaches your price
-- Better price control but no guarantee of execution
+ 🌐 Deployment Plan
 
-### Stop Market
-- Set a trigger price
-- Market order executes when trigger price is reached
-- Useful for stop-loss or take-profit strategies
+| Component   | Hosting Options                           |
+|-------------|--------------------------------------------|
+| Supabase    | [supabase.com](https://supabase.com)       |
+| Backend     | Docker → Cloud Run, Heroku, DigitalOcean   |
+| Frontend    | Vercel / Netlify / Render / Fly.io         |
+ 🔐 Production Considerations
 
-### TWAP (Time-Weighted Average Price)
-- Splits large orders into smaller pieces
-- Executes over a specified time period
-- Helps minimize market impact
+- Use HTTPS
+- Secure secrets & JWT validation
+- Set proper CORS policies
+- Enable DB backups and logging
 
-### Grid Trading
-- Creates a grid of buy and sell orders
-- Automatically trades within price ranges
-- Profits from price oscillations
 
-## Safety Features
 
-- Testnet Environment: No real money at risk
-- Input Validation: Prevents invalid orders
-- Minimum Order Checks: Ensures orders meet exchange requirements
-- Error Handling: Clear error messages for common issues
+ 🧠 Future Enhancements
 
-## Logging
+- Save/load strategy templates
+- Admin dashboard
+- Notifications (e.g., Telegram, Email)
+- Test coverage & CI/CD pipelines
+- 2FA support via Supabase
+- UI for audit logs
 
-The bot maintains logs of all trading activities:
-- Order details
-- Execution status
-- Error messages
-- Trade history
 
-Logs are stored in `bot.log`
 
-## Error Handling
 
-The bot includes comprehensive error handling for:
-- Invalid inputs
-- Network issues
-- API errors
-- Exchange-specific restrictions
 
-## Disclaimer
-
-This is a testing tool using Binance's testnet.
 
 
 
