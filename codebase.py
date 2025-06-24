@@ -89,7 +89,7 @@ class BasicBot:
                 min_qty = float(lot_size_filter['minQty'])
                 max_qty = float(lot_size_filter['maxQty'])
                 step_size = float(lot_size_filter['stepSize'])
-                
+
                 if quantity < min_qty:
                     console.print(f"[red]Error: Quantity {quantity} is below minimum allowed ({min_qty})[/red]")
                     return None
@@ -101,7 +101,7 @@ class BasicBot:
                     min_price = float(price_filter['minPrice'])
                     max_price = float(price_filter['maxPrice'])
                     tick_size = float(price_filter['tickSize'])
-                    
+
                     if price < min_price:
                         console.print(f"[red]Error: Price {price} is below minimum allowed ({min_price})[/red]")
                         return None
@@ -117,7 +117,7 @@ class BasicBot:
                 min_notional = float(notional_filter['minNotional'])
                 order_value = quantity * (price or current_price)
                 print(f"Debug: Order value = {order_value}, Min notional = {min_notional}")  # Debug print
-                
+
                 if order_value < min_notional:
                     print(f"Debug: Order value too small, showing panel")  # Debug print
                     min_qty = 5.0 / (price or current_price)  # Using fixed 5 USDT minimum
@@ -138,10 +138,10 @@ class BasicBot:
                 'side': side,
                 'quantity': quantity
             }
-            
+
             logger.info(f"Placing {order_type} order - Symbol: {symbol}, Side: {side}, Quantity: {quantity}")
             log_order(order_type, symbol, side, quantity, price)
-            
+
             with console.status(f"[bold blue]Placing order...") as status:
                 if order_type == 'MARKET':
                     order_params['type'] = ORDER_TYPE_MARKET
@@ -156,17 +156,17 @@ class BasicBot:
                         'type': ORDER_TYPE_STOP_LOSS,
                         'stopPrice': stop_price
                     })
-                
+
                 order = self.client.create_order(**order_params)
                 timestamp = datetime.fromtimestamp(int(order['transactTime']) / 1000)
-                
+
                 log_order(order_type, symbol, side, quantity, price, order.get('status'), order.get('orderId'))
-                
+
                 # Show success message with order details
                 table = Table(title=f"✅ Order Placed Successfully - {timestamp.strftime('%H:%M:%S')}")
                 table.add_column("Field", style="cyan")
                 table.add_column("Value", style="green")
-                
+
                 table.add_row("Order ID", str(order['orderId']))
                 table.add_row("Symbol", symbol)
                 table.add_row("Type", order_type)
@@ -177,10 +177,10 @@ class BasicBot:
                 if stop_price:
                     table.add_row("Stop Price", str(stop_price))
                 table.add_row("Status", order.get('status', 'PENDING'))
-                
+
                 console.print(table)
                 return order
-                
+
         except BinanceAPIException as e:
             error_msg = str(e)
             if "MIN_NOTIONAL" in error_msg:
@@ -189,7 +189,7 @@ class BasicBot:
                 current_price = float(ticker['price'])
                 order_value = quantity * current_price
                 min_qty = 5.0 / current_price  # Using fixed 5 USDT minimum
-                
+
                 console.print(Panel(
                     f"[red]❌ Order value (${order_value:.2f} USDT) is too small[/red]\n" +
                     f"[white]Binance requires minimum trade value of $5.00 USDT[/white]\n" +
@@ -261,7 +261,7 @@ class BasicBot:
                 table = Table(title=f"Real-time Order Update - {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
                 table.add_column("Field", style="cyan")
                 table.add_column("Value", style=status_colors.get(order_status, 'white'))
-                
+
                 table.add_row("Order ID", str(order_id))
                 table.add_row("Symbol", symbol)
                 table.add_row("Type", order_type)
@@ -271,7 +271,7 @@ class BasicBot:
                 table.add_row("Executed Qty", executed_qty)
                 if executed_price:
                     table.add_row("Last Executed Price", executed_price)
-                
+
                 console.print(table)
                 logger.info(f"Real-time update for Order {order_id}: {order_status}")
         except Exception as e:
@@ -280,7 +280,7 @@ class BasicBot:
     def twap(self, symbol, side, total_qty, interval_sec, slices):
         try:
             qty_per_order = round(total_qty / slices, 6)
-            
+
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
@@ -288,18 +288,18 @@ class BasicBot:
                 TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                 TimeElapsedColumn(),
             ) as progress:
-                
+
                 task = progress.add_task(f"[cyan]Running TWAP: {slices} slices", total=slices)
-                
+
                 for i in range(slices):
                     progress.update(task, description=f"[cyan]Executing slice {i+1}/{slices}")
                     if not self.place_order(symbol, side, 'MARKET', qty_per_order):
                         raise Exception(f"Failed to place order for slice {i+1}")
                     time.sleep(interval_sec)
                     progress.advance(task)
-                
+
                 console.print("[green]TWAP execution completed successfully[/green]")
-                
+
         except Exception as e:
             console.print(f"[red]TWAP execution failed: {str(e)}[/red]")
 
@@ -308,16 +308,16 @@ class BasicBot:
             # Get current price
             ticker = self.client.get_symbol_ticker(symbol=symbol)
             current_price = float(ticker['price'])
-            
+
             # Validate grid parameters
             if lower_price >= upper_price:
                 console.print("[red]Error: Lower price must be less than upper price[/red]")
                 return
-            
+
             # Calculate price deviation percentage
             lower_deviation = abs(lower_price - current_price) / current_price
             upper_deviation = abs(upper_price - current_price) / current_price
-            
+
             # Show warning if price range is too wide (e.g., more than 50% from current price)
             if lower_deviation > 0.5 or upper_deviation > 0.5:
                 console.print(Panel(
@@ -333,17 +333,17 @@ class BasicBot:
                 ))
                 if not Confirm.ask("Do you want to continue with these prices?"):
                     return
-            
+
             # Calculate grid parameters
             price_step = (upper_price - lower_price) / (grids - 1)
-            
+
             # Show grid preview
             table = Table(title="Grid Trading Setup Preview")
             table.add_column("Level", style="cyan", justify="right")
             table.add_column("Price", style="green")
             table.add_column("Type", style="magenta")
             table.add_column("Quantity", style="blue")
-            
+
             for i in range(grids):
                 price = round(lower_price + i * price_step, 8)
                 order_type = "BUY" if side == "BUY" else "SELL"
@@ -353,12 +353,12 @@ class BasicBot:
                     order_type,
                     str(quantity)
                 )
-            
+
             console.print(table)
-            
+
             if not Confirm.ask("\nDo you want to place these grid orders?"):
                 return
-            
+
             # Place grid orders
             with Progress(
                 SpinnerColumn(),
@@ -366,9 +366,9 @@ class BasicBot:
                 BarColumn(),
                 TextColumn("[progress.percentage]{task.percentage:>3.0f}%")
             ) as progress:
-                
+
                 task = progress.add_task("[cyan]Setting up grid orders", total=grids)
-                
+
                 for i in range(grids):
                     price = round(lower_price + i * price_step, 8)
                     if not self.place_order(symbol, side, 'LIMIT', quantity, price):
@@ -376,9 +376,9 @@ class BasicBot:
                         if not Confirm.ask("Do you want to continue placing remaining orders?"):
                             break
                     progress.advance(task)
-                
+
             console.print("[green]Grid setup completed[/green]")
-                
+
         except Exception as e:
             console.print(f"[red]Error setting up grid: {str(e)}[/red]")
 
@@ -389,7 +389,7 @@ class BasicBot:
                 'recvWindow': 5000
             }
             account_info = self.client.get_account(**params)
-            
+
             # Filter balances to show only coins with non-zero balance
             non_zero_balances = [{
                 'asset': balance['asset'],
@@ -397,25 +397,25 @@ class BasicBot:
                 'locked': float(balance['locked'])
             } for balance in account_info['balances']
                 if float(balance['free']) > 0 or float(balance['locked']) > 0]
-            
+
             if non_zero_balances:
                 # Create and style the table
                 table = Table(title="Account Balances", show_header=True, header_style="bold magenta")
                 table.add_column("Asset", style="cyan")
                 table.add_column("Available", style="green")
                 table.add_column("Locked", style="yellow")
-                
+
                 for balance in non_zero_balances:
                     table.add_row(
                         balance['asset'],
                         f"{balance['free']:.8f}",
                         f"{balance['locked']:.8f}"
                     )
-                
+
                 console.print(table)
             else:
                 console.print("[yellow]No coins with non-zero balance found.[/yellow]")
-                
+
         except BinanceAPIException as e:
             console.print(f"[red]Failed to fetch account info: {str(e)}[/red]")
 
@@ -423,38 +423,38 @@ class BasicBot:
         try:
             # Get symbol info from Binance API
             symbol_info = self.client.get_symbol_info(symbol)
-            
+
             if not symbol_info:
                 raise ValueError(f"Trading pair {symbol} not found")
-            
+
             if not symbol_info.get('isSpotTradingAllowed'):
                 raise ValueError(f"Spot trading is not allowed for {symbol}")
-            
+
             # Find the LOT_SIZE filter
             lot_size_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'LOT_SIZE'), None)
             # Find the PRICE_FILTER
             price_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER'), None)
-            
+
             # Create info table
             table = Table(title=f"Symbol Information - {symbol}", show_header=True)
             table.add_column("Property", style="cyan")
             table.add_column("Value", style="green")
-            
+
             # Add relevant trading info
             table.add_row("Base Asset", symbol_info['baseAsset'])
             table.add_row("Quote Asset", symbol_info['quoteAsset'])
-            
+
             if lot_size_filter:
                 table.add_row("Min Quantity", lot_size_filter['minQty'])
                 table.add_row("Max Quantity", lot_size_filter['maxQty'])
                 table.add_row("Step Size", lot_size_filter['stepSize'])
-            
+
             if price_filter:
                 table.add_row("Tick Size", price_filter['tickSize'])
-            
+
             console.print(table)
             return symbol_info
-            
+
         except BinanceAPIException as e:
             logger.error(f"Failed to validate symbol {symbol}: {e}")
             raise ValueError(f"Failed to validate symbol {symbol}: {e}")
@@ -480,10 +480,10 @@ def main():
         "[dim]Testnet Edition[/dim]",
         border_style="blue"
     ))
-    
+
     console.print("[bold blue]Initializing bot...[/bold blue]")
     bot = BasicBot(API_KEY, API_SECRET)
-    
+
     while True:
         # Create mode selection table
         table = Table(title="Available Options", show_header=True, header_style="bold magenta")
@@ -497,24 +497,41 @@ def main():
         table.add_row("ACCOUNT", "View account balances")
         table.add_row("EXIT", "Exit the program")
         console.print(table)
-        
-        mode = Prompt.ask(
-            "Choose mode",
-            choices=["MARKET", "LIMIT", "STOP_MARKET", "TWAP", "GRID", "ACCOUNT", "EXIT"]
-        )
-        
+
+        valid_modes = ["MARKET", "LIMIT", "STOP_MARKET", "TWAP", "GRID", "ACCOUNT", "EXIT"]
+        while True:
+            mode_input = Prompt.ask("Choose mode")
+            mode = mode_input.upper() # Convert input to uppercase
+            if mode in valid_modes:
+                break
+            else:
+                # Provide a more helpful error message
+                console.print(
+                    f"[yellow]Invalid mode '[bold]{mode_input}[/bold]'. Please choose from the available options. "
+                    f"Ensure you are using full uppercase mode names (e.g., MARKET, LIMIT, TWAP).[/yellow]"
+                )
+
         if mode == "EXIT":
             console.print("[bold blue]Shutting down bot...[/bold blue]")
             bot.twm.stop()  # Clean up WebSocket connection
             console.print("[bold blue]Thank you for using Binance Trading Bot![/bold blue]")
             break
-        
+
         if mode == "ACCOUNT":
             bot.get_account_info()
             continue
-        
+
         # Symbol selection with validation
-        symbol = Prompt.ask("Symbol", default=DEFAULT_SYMBOL)
+        raw_symbol_input = Prompt.ask("Symbol", default=DEFAULT_SYMBOL)
+        symbol_input_upper = raw_symbol_input.upper()
+
+        if symbol_input_upper in TRADING_PAIRS:
+            symbol = TRADING_PAIRS[symbol_input_upper]
+            if symbol != symbol_input_upper: # Inform only if a conversion happened
+                 console.print(f"[cyan]Interpreting '[bold]{raw_symbol_input}[/bold]' as '[bold]{symbol}[/bold]'[/cyan]")
+        else:
+            symbol = symbol_input_upper # Use the uppercased input directly if not in TRADING_PAIRS
+
         try:
             symbol_info = bot.validate_symbol(symbol)
             console.print(f"[green]Trading pair {symbol} validated successfully[/green]")
@@ -526,12 +543,12 @@ def main():
             side = Prompt.ask("Side", choices=["BUY", "SELL"])
             qty = get_float("Quantity")
             price = stop_price = None
-            
+
             if mode == 'LIMIT':
                 price = get_float("Limit Price")
             elif mode == 'STOP_MARKET':
                 stop_price = get_float("Stop Price")
-                
+
             bot.place_order(symbol, side, mode, qty, price, stop_price)
 
         elif mode == 'TWAP':

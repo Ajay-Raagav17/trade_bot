@@ -66,8 +66,10 @@ python codebase.py
    - ACCOUNT: View your account balances
    - EXIT: Close the program
 
+   **Note on Input:** Mode selection is case-insensitive (e.g., 'market' or 'MARKET' will work). For symbol inputs, common coin tickers (like 'BTC', 'ETH', 'XRP') are automatically interpreted as their primary USDT pairs (e.g., 'BTCUSDT', 'ETHUSDT', 'XRPUSDT'). The bot will confirm the interpreted symbol before proceeding.
+
 3. Follow the interactive prompts to:
-   - Select trading pairs
+   - Select trading pairs (you can use full names like 'BTCUSDT' or shorthands like 'BTC')
    - Enter order quantities
    - Set prices (for limit orders)
    - Configure strategy parameters
@@ -132,4 +134,4 @@ This is a testing tool using Binance's testnet.
 
 ## License
 
-[MIT License](LICENSE) 
+[MIT License](LICENSE)
