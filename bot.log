@@ -1,17 +1,21 @@
-2025-05-27 19:50:37 - Successfully verified spot trading access
 2025-05-27 19:51:53 - Successfully verified spot trading access
-2025-05-27 19:52:26 - Placing LIMIT order - Symbol: XRPUSDT, Side: SELL, Quantity: 5.0
-2025-05-27 19:52:26 - ORDER: LIMIT XRPUSDT SELL 5.0 @ 1.8
-2025-05-27 19:52:26 - ORDER: LIMIT XRPUSDT SELL 5.0 @ 1.8 - Status: FILLED (ID: 5378975)
-2025-05-27 19:52:49 - Placing MARKET order - Symbol: SOLUSDT, Side: SELL, Quantity: 0.5
-2025-05-27 19:52:49 - ORDER: MARKET SOLUSDT SELL 0.5
-2025-05-27 19:52:50 - ORDER: MARKET SOLUSDT SELL 0.5 - Status: FILLED (ID: 3459786)
-2025-05-27 19:52:54 - Placing MARKET order - Symbol: SOLUSDT, Side: SELL, Quantity: 0.5
-2025-05-27 19:52:54 - ORDER: MARKET SOLUSDT SELL 0.5
-2025-05-27 19:52:54 - ORDER: MARKET SOLUSDT SELL 0.5 - Status: FILLED (ID: 3459787)
-2025-05-27 19:52:58 - Placing MARKET order - Symbol: SOLUSDT, Side: SELL, Quantity: 0.5
-2025-05-27 19:52:58 - ORDER: MARKET SOLUSDT SELL 0.5
-2025-05-27 19:52:59 - ORDER: MARKET SOLUSDT SELL 0.5 - Status: FILLED (ID: 3459788)
-2025-05-27 19:53:23 - Placing MARKET order - Symbol: BTCUSDT, Side: SELL, Quantity: 0.1
-2025-05-27 19:53:23 - ORDER: MARKET BTCUSDT SELL 0.1
-2025-05-27 19:53:23 - ORDER: MARKET BTCUSDT SELL 0.1 - Status: FILLED (ID: 8175452)
+2025-06-24 16:40:00,000 - trading_bot - INFO - ORDER: MARKET BTCUSDT BUY 0.01 - Status: FILLED (ID: 9000011)
+2025-06-24 16:41:01,000 - trading_bot - INFO - User exited the program
+2025-06-24 16:41:32,000 - trading_bot - INFO - ORDER: MARKET BTCUSDT BUY 0.01 - Status: FILLED (ID: 9000011)
+2025-06-24 16:42:51,000 - trading_bot - INFO - Placing MARKET order - Symbol: BTCUSDT, Side: BUY, Quantity: 0.01
+2025-06-24 16:43:57,000 - trading_bot - INFO - Successfully verified spot trading access
+2025-06-24 16:44:32,000 - trading_bot - ERROR - Error placing LIMIT order: APIError(code=-1013): Filter failure: NOTIONAL
+2025-06-24 16:44:52,000 - trading_bot - INFO - Placing LIMIT order - Symbol: XRPUSDT, Side: SELL, Quantity: 5.0, Price: 1.2
+2025-06-24 16:45:28,000 - trading_bot - INFO - Placed LIMIT BUY LTCUSDT 0.2 @ 75.0 - Status: NEW (ID: 9000017)
+2025-06-24 16:46:00,000 - trading_bot - ERROR - Error placing LIMIT order: APIError(code=-1013): Filter failure: NOTIONAL
+2025-06-24 16:47:10,000 - trading_bot - INFO - Placing GRID orders - Symbol: LTCUSDT, Mode: BUY, Grids: 3, Range: 70.0–80.0, Quantity/
+Order: 0.2
+2025-06-24 16:48:03,000 - trading_bot - INFO - ORDER: LIMIT XRPUSDT SELL 5.0 @ 1.2 - Status: FILLED (ID: 9000012)
+2025-06-24 16:49:17,000 - trading_bot - INFO - Successfully verified spot trading access
+2025-06-24 16:49:53,000 - trading_bot - INFO - Starting TWAP Execution - Symbol: SOLUSDT, Side: SELL, Quantity: 1.0, Slices: 2, Interval: 2s
+2025-06-24 16:51:08,000 - trading_bot - INFO - Placing LIMIT order - Symbol: XRPUSDT, Side: SELL, Quantity: 5.0, Price: 1.2
+2025-06-24 16:52:00,000 - trading_bot - INFO - Placing LIMIT order - Symbol: XRPUSDT, Side: SELL, Quantity: 5.0, Price: 1.2
+2025-06-24 16:52:23,000 - trading_bot - INFO - User exited the program
+2025-06-24 16:54:51,000 - trading_bot - INFO - TWAP Slice 1/2 - MARKET SELL 0.5 SOLUSDT - Status: FILLED (ID: 9000014)
+2025-06-24 16:55:33,000 - trading_bot - INFO - Successfully verified spot trading access
+2025-06-24 16:56:54,000 - trading_bot - INFO - TWAP Slice 2/2 - MARKET SELL 0.5 SOLUSDT - Status: FILLED (ID: 9000015)
